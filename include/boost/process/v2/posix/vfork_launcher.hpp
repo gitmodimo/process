@@ -126,6 +126,19 @@ struct vfork_launcher :  default_launcher
         return proc;
 
     }
+
+protected:
+
+    void prepare_close_all_fds()
+    {
+        std::sort(fd_whitelist.begin(), fd_whitelist.end());
+    }
+
+    void close_all_fds(error_code & ec)
+    {
+        detail::close_all(fd_whitelist, ec);
+    }
+	
 };
 
 
