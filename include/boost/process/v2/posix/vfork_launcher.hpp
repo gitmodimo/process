@@ -89,7 +89,6 @@ struct vfork_launcher :  default_launcher
         auto & ctx = BOOST_PROCESS_V2_ASIO_NAMESPACE::query(
                 exec, BOOST_PROCESS_V2_ASIO_NAMESPACE::execution::context);
         ctx.notify_fork(BOOST_PROCESS_V2_ASIO_NAMESPACE::execution_context::fork_prepare);
-		prepare_close_all_fds();
         pid = ::vfork();
         if (pid == -1)
         {
@@ -102,11 +101,15 @@ struct vfork_launcher :  default_launcher
         }
         else if (pid == 0)
         {
+            ctx.notify_fork(BOOST_PROCESS_V2_ASIO_NAMESPACE::execution_context::fork_child);
             ec = detail::on_exec_setup(*this, executable, argv, inits...);
             if (!ec)
                 close_all_fds(ec);
             if (!ec)
                 ::execve(executable.c_str(), const_cast<char * const *>(argv), const_cast<char * const *>(env));
+
+            BOOST_PROCESS_V2_ASSIGN_EC(ec, errno, system_category())
+            detail::on_exec_error(*this, executable, argv, ec, inits...);
             ::exit(EXIT_FAILURE);
             return basic_process<Executor>{exec};
         }
@@ -122,18 +125,6 @@ struct vfork_launcher :  default_launcher
         detail::on_success(*this, executable, argv, ec, inits...);
         return proc;
 
-    }
-	protected:
-
-    void prepare_close_all_fds()
-    {
-        std::sort(fd_whitelist.begin(), fd_whitelist.end());
-    }
-
-    void close_all_fds(error_code & ec)
-    {
-        detail::close_all(fd_whitelist, ec);
-        fd_whitelist = {STDIN_FILENO, STDOUT_FILENO, STDERR_FILENO};
     }
 };
 
